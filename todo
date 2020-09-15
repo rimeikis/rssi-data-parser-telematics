@@ -1,0 +1,13 @@
+2.0.3
+sutvarkyt kad nekurtu empty failo
+sutvarkyt kad netycia ivedus netinkama comporta:
+    rasytu loading... press X to return arba po kazkiek timeoutintu ir rasytu kad nesulauke jokiu rssi duomenu
+fixint error handling
+isvalyt koda DRY
+butu nice pridet available MAC adresu sarasa po scan'o.
+prideti funcionaluma kuris rasytu ar yra pazeidimas (proximity violation)
+!!! PAZIUREK GAL NEREIKIA EIT LINE BY LINE, SPLITTINT VISKO I ELEMENTS IR EIT PER TUOS ELEMENTS ONE BY ONE. 
+!!! GAL TIESIOG GALI READINT LINE IR ZIURET AR JOJ YRA STRING KURIS STARTINA SU - IR NERA -> ?
+Tip: parasyk is pradziu testa, o tada koda, kuris turi ta testa praeit. Taip isvengsi bugovu kodu.
+Pridet com port number invalid user input error handling
+Pridet MAC adreso regex formato validatinima
