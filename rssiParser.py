@@ -1,7 +1,3 @@
-## CHANGELOG ##
-# Sutvarkytas bufferinimas papildomu duomenu, kurie neturejo buti rssi data scenarijuose
-# Sutvarkyta struktura - suskirstyta logika i atskiras funkcijas
-
 from datetime import datetime
 import statistics
 from serial.tools.list_ports import comports

@@ -1,1 +1,1 @@
-"# rssi-data-parser-telematics" 
+A rssi data parser for a telematics device. The parser works by firstly receiving binary data from a device via a USB connect to a COM port. The live data is then read line by line in order to extract only the data that is required which in this case is the rssi data. This data is then exported into an excel file for easy data analysis.
