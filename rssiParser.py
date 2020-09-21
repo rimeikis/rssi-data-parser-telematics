@@ -5,8 +5,9 @@ import serial
 import sys
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Alignment, Font
+from openpyxl.chart import LineChart, Reference, Series
 
-VERSION = "rssiParser_2.0.8"
+VERSION = "rssiParser_2.0.9"
 
 
 def setup():
@@ -16,6 +17,7 @@ def setup():
     for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
         sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
         ports.append(port)
+
     while True:
         port = input('>>> Enter port index or full name: ')
         try:
@@ -27,13 +29,14 @@ def setup():
             pass
         else:
             port = ports[index]
-        serial_port = serial.Serial(
-            port=port,
-            baudrate=115200,
-            bytesize=8,
-            timeout=2,
-            stopbits=serial.STOPBITS_ONE)
-        serial_port.close()
+
+        serial_port = serial.Serial()
+        serial_port.port = port
+        serial_port.baudrate = 4800
+        serial_port.bytesize = 5
+        serial_port.timeout = 1
+        serial_port.stopbits = serial.STOPBITS_ONE
+
         imei = str(input(">>> Enter target IMEI address: "))
         imei = imei.encode('utf-8')
         process_start_time = datetime.now()
@@ -41,14 +44,29 @@ def setup():
         main(serial_port, imei, process_start_time, workbook, 1)
 
 
-def format_worksheet(worksheet, scenario_note, imei, scenario_start_time):
-    # FUNCTION FOR SETTING UP THE EXCEL WORKSHEET LAYOUT AND FORMAT
+def format_worksheet(worksheet, scenario_note, imei, scenario_start_time, rssi_power_list, rssi_average_list):
+    # FUNCTION FOR SETTING UP THE EXCEL WORKSHEET LAYOUT, FORMAT AND CHART
+    line_chart = LineChart()
+    line_chart.title = "RSSI Power Graph"
+    line_chart.y_axis.title = 'RSSI Level'
+    line_chart.x_axis.title = 'Data Count'
+    rssi_power_data = Reference(worksheet, min_col=9, min_row=8,
+                                max_col=9, max_row=len(rssi_power_list)+7)
+    power_series = Series(rssi_power_data, title="Actual RSSI Power")
+    line_chart.append(power_series)
+    rssi_average_data = Reference(worksheet, min_col=15, min_row=8,
+                                  max_col=15, max_row=len(rssi_average_list)+7)
+    average_series = Series(rssi_average_data, title="Averaged RSSI Power")
+    line_chart.append(average_series)
+    worksheet.add_chart(line_chart, "Q6")
+
     worksheet.merge_cells('A1:O1')
     worksheet.merge_cells('A3:O3')
     worksheet.merge_cells('A4:O4')
     worksheet.merge_cells('A6:C6')
     worksheet.merge_cells('E6:I6')
     worksheet.merge_cells('K6:O6')
+
     worksheet['A3'].fill = PatternFill(
         start_color="1e90ff", end_color="1e90ff", fill_type="solid")
     worksheet['A6'].fill = PatternFill(
@@ -83,6 +101,7 @@ def format_worksheet(worksheet, scenario_note, imei, scenario_start_time):
         start_color="1e90ff", end_color="1e90ff", fill_type="solid")
     worksheet['O7'].fill = PatternFill(
         start_color="1e90ff", end_color="1e90ff", fill_type="solid")
+
     worksheet['A1'].alignment = Alignment(horizontal='center')
     worksheet['A3'].alignment = Alignment(horizontal='center')
     worksheet['A4'].alignment = Alignment(horizontal='center')
@@ -91,11 +110,13 @@ def format_worksheet(worksheet, scenario_note, imei, scenario_start_time):
     worksheet['E6'].alignment = Alignment(horizontal='center')
     worksheet['J6'].alignment = Alignment(horizontal='center')
     worksheet['K6'].alignment = Alignment(horizontal='center')
+
     worksheet['A3'].font = Font(bold=True)
     worksheet['A6'].font = Font(bold=True)
     worksheet['K6'].font = Font(bold=True)
     worksheet['A1'].font = Font(bold=True)
     worksheet['E6'].font = Font(bold=True)
+
     worksheet['A1'] = 'RSSI PARSE RESULTS'
     worksheet['A3'] = 'Scenario notes'
     worksheet['A4'] = scenario_note
@@ -105,7 +126,7 @@ def format_worksheet(worksheet, scenario_note, imei, scenario_start_time):
     worksheet['B7'] = 'Start time'
     worksheet['B8'] = scenario_start_time
     worksheet['C7'] = 'Duration'
-    worksheet['E6'] = 'RSSI Power'
+    worksheet['E6'] = 'Actual RSSI Power'
     worksheet['E7'] = 'Data count'
     worksheet['E8'] = '=COUNT(I8:I1048576)'
     worksheet['F7'] = 'Average'
@@ -115,7 +136,7 @@ def format_worksheet(worksheet, scenario_note, imei, scenario_start_time):
     worksheet['H7'] = 'Min'
     worksheet['H8'] = '=MIN(I8:I1048576)'
     worksheet['I7'] = 'Data'
-    worksheet['K6'] = 'RSSI Average'
+    worksheet['K6'] = 'Averaged RSSI Power'
     worksheet['K7'] = 'Data count'
     worksheet['K8'] = '=COUNT(O8:O1048576)'
     worksheet['L7'] = 'Average'
@@ -137,28 +158,20 @@ def terminal_display(process_start_time, imei, rssi_power, rssi_average, rssi_po
         '|~~~~~~~~~~~~~~~~~~ RSSI DATA ~~~~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~ PARSE DETAILS ~~~~~~~~~~~~~~~|\n')
     sys.stderr.write(
         '|-------------------------------------------------|------------------------------------------------|\n')
-
     sys.stderr.write('|  {:^20}  |  {:^20}  |  {:^44}  |\n'.format(
         "ACTUAL RSSI POWER", "AVERAGED RSSI POWER", "Target IMEI: " + imei.decode('utf-8')))
-
     sys.stderr.write(
         '|------------------------|------------------------|------------------------------------------------|\n')
-
     sys.stderr.write('|  {:^20}  |  {:^20}  |  {:^44}  |\n'.format(
         f"Current: {rssi_power}", f"Current: {rssi_average}", f"Start: {process_start_time}"))
-
     sys.stderr.write('|  {:^20}  |  {:^20}  |------------------------------------------------|\n'.format(
         f"Count: {len(rssi_power_list)}", f"Count: {len(rssi_average_list)}"))
-
     sys.stderr.write('|  {:^20}  |  {:^20}  |  {:^40}  |\n'.format(f"Max: {max(rssi_power_list)}",
                                                                    f"Max: {max(rssi_average_list)}", "Hit 'CTRL+C' to stop parsing. A file will be"))
-
     sys.stderr.write('|  {:^20}  |  {:^20}  |  {:^40}  |\n'.format(f"Min: {min(rssi_power_list)}",
                                                                    f"Min: {min(rssi_average_list)}", "generated containing summary of parsed data."))
-
-    sys.stderr.write('|  {:^20}  |  {:^20}  |  {:^40}  |\n'.format(
+    sys.stderr.write('|  {:^20}  |  {:^20}  |  {:^44}  |\n'.format(
         f"Avg: {round(statistics.mean(rssi_power_list))}", f"Avg: {round(statistics.mean(rssi_average_list))}", ""))
-
     sys.stderr.write(
         '|------------------------|------------------------|------------------------------------------------|\n')
     sys.stderr.write('\n\n\n\n\n\n\n\n\n\n')
@@ -173,35 +186,43 @@ def formatted_time():
 
 def main(serial_port, imei, process_start_time, workbook, scenario_count):
     # MAIN FUNCTION WHICH PERFORMS RSSI DATA PARSING
+    rssi_power_list = []
+    rssi_average_list = []
     scenario_number = scenario_count
     scenario_note = input('>>> Enter scenario description: ')
     scenario_start_time = datetime.now()
     worksheet = workbook.create_sheet(title='Scenario ' + str(scenario_number))
-    serial_port.open()
-    rssi_power_list = []
-    rssi_average_list = []
+
     try:
+        serial_port.open()
+        serial_port.reset_input_buffer()
         while (serial_port.is_open):
             serial_string = serial_port.read_until(b'\r')
-            if (imei and b'Teltonika') in serial_string:
+
+            if (imei in serial_string) and (b'Teltonika' in serial_string):
                 string_elements_list = serial_string.split()
                 rssi_power = int(string_elements_list[9].decode('utf-8')[:-1])
-                rssi_average = string_elements_list[11].decode('utf-8')[:-1]
+                rssi_average = int(
+                    string_elements_list[11].decode('utf-8')[:-1])
                 rssi_power_list.append(rssi_power)
-                rssi_average_list.append(int(rssi_average))
+                rssi_average_list.append(rssi_average)
                 worksheet['I'+str(len(rssi_power_list)+7)] = rssi_power
                 worksheet['O'+str(len(rssi_average_list)+7)
-                          ] = int(rssi_average)
+                          ] = rssi_average
                 terminal_display(process_start_time, imei, rssi_power,
                                  rssi_average, rssi_power_list, rssi_average_list)
             else:
                 continue
+
     except KeyboardInterrupt:
+        serial_port.reset_input_buffer()
         serial_port.close()
         worksheet['C8'] = str(datetime.now() - scenario_start_time)
-        format_worksheet(worksheet, scenario_note, imei, scenario_start_time)
+        format_worksheet(worksheet, scenario_note, imei,
+                         scenario_start_time, rssi_power_list, rssi_average_list)
         new_scenario = input(
             ">>> Do you wish to continue with another scenario for this test? (Y/N): ")
+
         if new_scenario.lower() == 'Y'.lower():
             scenario_count = scenario_number + 1
             main(serial_port, imei, process_start_time, workbook, scenario_count)
@@ -214,8 +235,19 @@ def main(serial_port, imei, process_start_time, workbook, scenario_count):
                           formatted_time() + '.xlsx')
             sys.stderr.write('--- File "parser_results_' + formatted_time() +
                              '.xlsx" containing parsed RSSI data\n--- is next to the ' + VERSION + '.exe" launcher.')
+
+    except IOError:
+        sys.stderr.write(
+            "IO Error! Possible reason - unable to open port.")
+        pass
+
+    except EOFError:
+        sys.stderr.write(
+            "EOF Error! Failed to read full line from serial port.")
+        pass
+
     finally:
-        input()
+        quit()
 
 
 setup()
